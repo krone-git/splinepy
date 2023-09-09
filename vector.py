@@ -8,7 +8,7 @@ from tensor import Tensor, TensorType
 class Vector(Tensor):
     @classmethod
     def new_tensor(cls, width, height=None, elements=None, **kwargs):
-        return cls(elements, dimension=height)
+        return cls(elements, dimension=height, **kwargs)
 
     @classmethod
     def axis(cls, index, dimension, scale=1):
@@ -16,17 +16,22 @@ class Vector(Tensor):
             [1 if i == index else 0 for i in range(dimension)], dimension
         )
     @classmethod
-    def empty(cls, dimension):
-        return super().empty(1, dimension)
+    def empty(cls, dimension, **kwargs):
+        return cls.fill(dimension, 0, **kwargs)
     @classmethod
-    def fill(cls, dimension, fill):
-        return super().fill(1, dimension, fill)
+    def fill(cls, dimension, fill, **kwargs):
+        kwargs.update(dimension=dimension, fill=fill)
+        return cls.new(
+            (), **kwargs
+        )
 
-    def __init__(self, *elements, dimension=None, **kwargs):
-        elements = elements[0] if isinstance(elements[0], Sized) \
+    def __init__(self, *elements, dimension=None, link=False, **kwargs):
+        elements = elements if not elements or elements[0] is None \
+            else elements[0] if isinstance(elements[0], Sized) \
             else tuple(elements[0]) if isinstance(elements[0], Iterable) \
-            else tuple(elements.elements) if isinstance(elements, TensorType) \
-            else [] if elements[0] is None else elements
+            else elements[0]._elements if isinstance(elements[0], Tensor) and link \
+            else tuple(elements.elements) if isinstance(elements[0], TensorType)\
+            else elements
         dimension = len(elements) if dimension is None else dimension
         super().__init__(
             1, height=dimension, elements=elements, **kwargs
@@ -36,7 +41,7 @@ class Vector(Tensor):
     @property
     def magnitude(self):
         return sum(
-            (i**2 for i in self._elements)
+            (i**2 for i in self.elements)
         )**0.5
     @property
     def unit(self): return self / self.magnitude
@@ -58,6 +63,8 @@ class Vector(Tensor):
                 range(self.dimension), 2
             )
         )
+    @property
+    def transpose(self): return Tensor.from_rows(self.columns)
 
     def cosine(self, other):
         return self.dot(other) / (self.magnitude * other.magnitude)
@@ -107,5 +114,5 @@ class Vector(Tensor):
                 dimension=self.dimension
             )
 
-    def __getitem__(self, index): return self._elements[index]
-    def __iter__(self): return iter(self._elements)
+    def __getitem__(self, index): return self.get_index(index)
+    def __iter__(self): return self.elements
