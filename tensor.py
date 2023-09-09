@@ -33,6 +33,8 @@ class TensorType(ABC):
     @property
     def degree(self): return len(self._shape)
     @property
+    def is_empty(self): return set(self.elements) == {0}
+    @property
     def columns(self):
         return (
             self.column(i) for i in range(self.width)
@@ -255,7 +257,11 @@ class TensorType(ABC):
             self.set_index(i, v * other)
             for i, v in enumerate(self.elements)
         ]
-        return self        
+        return self
+
+    def equivalent(self, other): 
+        return tuple(self.elements) == tuple(other.elements) \
+            and self._shape == other._shape
     
     def display(self, truncate=3, pad=2, indent=2):
         elements = [
@@ -279,11 +285,11 @@ class TensorType(ABC):
         return self
 
     def __getitem__(self, address): return self.element(*address)
-    def __setitem__(self, address, element): 
-        self.set_element(element, *address)
+    def __setitem__(self, address, element):
+        self.set_element(element, *address) if isinstance(address, Iterable) \
+            else self.set_index(address, element)
     def __neg__(self): return self.scale(-1)
-    def __eq__(self, other): 
-        return tuple(self.elements) == tuple(other.elements)
+    def __eq__(self, other): return self.equivalent(other)
     def __add__(self, other): return self.add(other)
     def __iadd__(self, other): return self.iadd(other)
     def __sub__(self, other): return self.subtract(other)
@@ -420,12 +426,22 @@ class Tensor(TensorType):
             return tensor
     
     @classmethod
-    def new_tensor(cls, width, height=None, elements=None, fill=None):
-        return cls(width, height=height, elements=elements, fill=fill)
+    def new_tensor(cls, width, height=None, elements=None, fill=None, 
+                   link=False):
+        return cls(
+            width, 
+            height=height, 
+            elements=elements, 
+            fill=fill, 
+            link=link
+        )
     @classmethod
-    def from_tensor(cls, tensor):
+    def from_tensor(cls, tensor, **kwargs):
         return cls.new_tensor(
-            tensor.width, height=tensor.height, elements=tensor.elements
+            tensor.width,
+            height=tensor.height,
+            elements=tensor.elements,
+            **kwargs
         )
     @classmethod
     def from_rows(cls, rows, **kwargs):
@@ -456,23 +472,19 @@ class Tensor(TensorType):
         )
     @classmethod
     def empty(cls, width, height, **kwargs):
-        kwargs.update(fill=0)
-        return cls.new_tensor(
-            width, height=height,
-            elements=[0] * (width * height),
-            **kwargs
-        )
+        return cls.fill(width, height, 0, **kwargs)
     @classmethod
     def fill(cls, width, height, fill, **kwargs):
-        return cls.new_tensor(
-            width, height=height, elements=[], fill=fill
-        )
+        kwargs.update(height=height, elements=[], fill=fill)
+        return cls.new(width, **kwargs)
 
-    def __init__(self, width, height=None, elements=None, fill=None):
-        self._elements = elements if isinstance(elements, list) \
+    def __init__(self, width, height=None, elements=None, fill=None, link=False):
+        self._elements = elements if isinstance(elements, list) and link \
+            else elements._elements if isinstance(elements, Tensor) and link \
             else list(elements.elements) if isinstance(elements, TensorType) \
             else list(elements) if isinstance(elements, Iterable) \
-            else [elements] if elements is not None else []
+            else [elements] if elements is not None \
+            else []
         
         element_size = len(self._elements)
         height = height if height is not None \
@@ -485,6 +497,8 @@ class Tensor(TensorType):
         self._elements.clear()
         self._elements.extend(temp[:self.size])
 
+    @property
+    def is_empty(self): return set(self._elements) == {0}
     @property
     def elements(self): return iter(self._elements)
     @property
@@ -531,7 +545,7 @@ class Tensor(TensorType):
         return self._elements[start : stop : step]
     def cofactor_elements(self, column, row):
         return [
-            v for i, v in enumerate(self._elements) \
+            v for i, v in enumerate(self.elements) \
             if i % self.width != column and i // self.width != row
         ]
 
@@ -587,6 +601,10 @@ class Tensor(TensorType):
             self.dot_elements(other)
         )
         return other
+
+    def equivalent(self, other):
+        return self._elements == other._elements \
+            and self._shape == other._shape
     
     def copy(self, **kwargs):
         return self.new_tensor(
@@ -597,8 +615,6 @@ class Tensor(TensorType):
         return self.element(*address) if isinstance(address, Iterable) \
             else self.slice_elements(address) if isinstance(address, slice) \
             else self.row_reference(address)
-    def __eq__(self, other):
-        return self._elements == other._elements
     def __mul__(self, other):
         return self.scale(other) if isinstance(other, Number) \
             else self.scale(other._elements[0]) \
