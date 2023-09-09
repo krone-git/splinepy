@@ -1,4 +1,4 @@
-from collections.abc import Iterable
+from collections.abc import Iterable, Sized
 
 from tensor import Tensor, TensorType
 from vector import Vector
@@ -31,14 +31,18 @@ class Matrix(Tensor):
             elements[i * dimension + i] = 1
         return self.new_tensor(dimension, elements=elements)
     @classmethod
-    def empty(cls, dimension):
-        return super().empty(dimension, dimension)
+    def empty(cls, dimension, **kwargs):
+        return cls.fill(dimension, 0, **kwargs)
     @classmethod
-    def fill(cls, dimension, fill):
-        return super().empty(1, dimension, fill)
+    def fill(cls, dimension, fill, **kwargs):
+        kwargs.update(dimension=dimension, fill=fill)
+        return cls.new(
+            (), **kwargs
+        )
 
-    def __init__(self, elements, dimension=None, **kwargs):
-        elements = elements if isinstance(elements, list) \
+    def __init__(self, elements, dimension=None, link=False, **kwargs):
+        elements = elements if isinstance(elements, Sized) \
+            else elements._elements if isinstance(elements, Tensor) and link \
             else list(elements.elements) if isinstance(elements, TensorType) \
             else list(elements) if isinstance(elements, Iterable) \
             else [elements] if elements is not None else []
