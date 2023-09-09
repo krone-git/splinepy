@@ -48,7 +48,7 @@ class TkinterGraphComponent(ABC):
     def vertical_origin(self): return self._origin[1]
     @vertical_origin.setter
     def vertical_origin(self, coord): 
-        self.set_origin(selfr.horizontal_origin, coord)
+        self.set_origin(self.horizontal_origin, coord)
     
     def set_visible(self, state):
         self._visible = bool(state)
@@ -178,7 +178,7 @@ class TkinterGraphPoint(SingleElementTkinterGraphComponent):
     @property
     def position(self): return tuple(self._position)
     @position.setter
-    def position(self, postion): self.set_position(*position)
+    def position(self, position): self.set_position(*position)
     @property
     def position_reference(self): return self._position
     @property
